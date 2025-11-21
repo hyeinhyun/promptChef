@@ -1,1 +1,28 @@
-author : hyunhi
+# PromptChef MVP API
+
+PromptChef는 한국 비즈니스 맥락에 맞춰 프롬프트를 계획·합성·평가·보정하여 미리보기를 제공하는 실험용 FastAPI 서비스입니다. 이 리포지토리는 외부 LLM 없이 동작하는 MVP 스켈레톤을 포함합니다.
+
+## 주요 구성
+- `app/main.py`: FastAPI 엔드포인트(`/compose_and_run`, `/feedback`, `/healthz`).
+- `app/pipeline.py`: Planner → Composer → Runner → Evaluator → Refiner 파이프라인을 간단한 규칙 기반으로 구현.
+- `app/models.py`: 프로필, 플랜, 번들, 평가 리포트, 실행 메타데이터에 대한 Pydantic 모델.
+
+## 실행 방법
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+## 사용 예시
+```bash
+curl -X POST http://localhost:8000/compose_and_run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "profile": {"role": "마케팅 매니저", "today_goal": "주간 보고", "tone_pref": "formal"},
+    "user_input": "회의 메모: 신규 캠페인 CTR 12% 개선, 예산 5% 상향 요청"
+  }'
+```
+
+응답에는 Planner 플랜, 합성된 프롬프트 섹션, 초안(preview), 보정본(final_output), 토큰/지연 메타가 포함됩니다.
