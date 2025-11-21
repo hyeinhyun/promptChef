@@ -8,11 +8,19 @@ PromptChef는 한국 비즈니스 맥락에 맞춰 프롬프트를 계획·합�
 - `app/models.py`: 프로필, 플랜, 번들, 평가 리포트, 실행 메타데이터에 대한 Pydantic 모델.
 
 ## 실행 방법
+uv(https://docs.astral.sh/uv/)으로 가상환경과 의존성을 관리하며, 필요한 패키지는 `pyproject.toml`에 정의되어 있습니다.
+
 ```bash
-python -m venv .venv
+# uv가 없다면 설치
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 프로젝트 의존성 설치
+uv venv
 source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uv sync
+
+# 개발 서버 실행
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ## 사용 예시
