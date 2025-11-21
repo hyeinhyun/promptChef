@@ -91,21 +91,69 @@ def planner(request: ComposeAndRunRequest) -> PlannerPlan:
     tone = infer_tone(request.profile.tone_pref)
     constraints = compose_constraints(task)
     confidence = 0.75 if request.profile.today_goal else 0.65
-    notes = None
-    if confidence <= 0.6:
-        notes = "대체 안을 함께 제시해야 함"
     output_form = {
         "summary_email": "보고용 요약 이메일",
         "insight_extraction": "3~5개 불릿 인사이트",
         "style_transfer": "톤 변환 공지문",
         "general_brief": "간결한 비즈니스 요약",
     }.get(task, "간결한 비즈니스 요약")
-    return PlannerPlan(
+    initial_plan = PlannerPlan(
         task_type=task,
         output_form=output_form,
         audience=request.profile.role or "업무 상사",
         tone=tone,
         constraints=constraints,
+        confidence=confidence,
+    )
+
+    return verify_plan_with_llm(initial_plan, request.user_input)
+
+
+def verify_plan_with_llm(plan: PlannerPlan, user_input: str) -> PlannerPlan:
+    """Simulate an agentic LLM pass that critiques and tightens the plan."""
+
+    lowered = user_input.lower()
+    llm_suggestions: List[str] = []
+    updated_constraints = list(plan.constraints)
+
+    if any(keyword in lowered for keyword in ["due", "deadline", "마감", "일정"]):
+        llm_suggestions.append("마감과 담당자를 명시하라는 제약을 추가합니다.")
+        updated_constraints.append("마감 일정과 담당자를 명확히 기재")
+
+    if any(keyword in lowered for keyword in ["표", "table", "data", "%", "자료"]):
+        llm_suggestions.append("숫자/데이터 근거를 표기하도록 요구합니다.")
+        updated_constraints.append("숫자 근거를 함께 제시")
+
+    if "친근" in user_input and plan.tone == "formal":
+        llm_suggestions.append("요청에 맞게 친근한 톤으로 전환합니다.")
+        tone = "friendly"
+    else:
+        tone = plan.tone
+
+    requires_actions = any("action" in c.lower() for c in updated_constraints)
+    if plan.task_type in {"summary_email", "general_brief"} and not requires_actions:
+        llm_suggestions.append("후속 조치가 드러나도록 Action items 제약을 추가합니다.")
+        updated_constraints.append("Action items 2개 이상 포함")
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped_constraints = []
+    for constraint in updated_constraints:
+        if constraint not in seen:
+            seen.add(constraint)
+            deduped_constraints.append(constraint)
+
+    coverage_score = min(1.0, 0.55 + 0.05 * len(deduped_constraints))
+    confidence = round(min(1.0, plan.confidence * 0.9 + coverage_score * 0.2), 2)
+
+    notes = " / ".join(llm_suggestions) if llm_suggestions else "LLM 검증: 주요 제약 충족 확인"
+
+    return PlannerPlan(
+        task_type=plan.task_type,
+        output_form=plan.output_form,
+        audience=plan.audience,
+        tone=tone,
+        constraints=deduped_constraints,
         confidence=confidence,
         notes=notes,
     )
