@@ -19,8 +19,15 @@ uv venv
 source .venv/bin/activate
 uv sync
 
-# 개발 서버 실행
+# 개발 서버 실행 (API가 필요할 때만)
 uv run uvicorn app.main:app --reload --port 8000
+
+# CLI에서 직접 파이프라인 실행
+uv run promptchef compose_and_run \
+  --data '{"profile": {"role": "마케팅 매니저", "tone_pref": "formal"}, "user_input": "회의 메모: 신규 캠페인"}'
+
+# 또는 파일로 요청 전달 (stdin도 지원)
+uv run promptchef /compose_and_run --file payload.json --pretty
 ```
 
 ## 사용 예시
