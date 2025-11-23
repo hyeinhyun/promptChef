@@ -72,6 +72,11 @@ class ComposeAndRunResponse(BaseModel):
     meta: RunMeta
 
 
+class AutoComposeResponse(BaseModel):
+    final: ComposeAndRunResponse
+    evaluations: List[EvalReport]
+
+
 class FeedbackRequest(BaseModel):
     run_id: str
     rating: int = Field(..., ge=1, le=5)
