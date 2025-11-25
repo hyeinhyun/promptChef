@@ -64,12 +64,33 @@ class ComposeAndRunRequest(BaseModel):
     user_input: str
 
 
+class ComposeAndPlanRequest(BaseModel):
+    profile: Profile
+    user_input: str
+
+
+class ComposeAndPlanResponse(BaseModel):
+    plan: PlannerPlan
+    bundle: PromptBundle
+
+
 class ComposeAndRunResponse(BaseModel):
     plan: PlannerPlan
-    bundle: PromptSection
+    bundle: PromptBundle
     preview: str
     final_output: str
     meta: RunMeta
+
+
+class RunWithRefineRequest(BaseModel):
+    bundle: PromptBundle
+
+
+class RunWithRefineResponse(BaseModel):
+    final_output: str
+    eval_meta: EvalReport
+    meta: RunMeta
+    draft: str | None = None
 
 
 class AutoComposeResponse(BaseModel):

@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 
-from .models import ComposeAndRunRequest, FeedbackRequest
-from .services.pipeline_service import compose_and_run, save_feedback
+from .models import (
+    ComposeAndPlanRequest,
+    ComposeAndRunRequest,
+    FeedbackRequest,
+    RunWithRefineRequest,
+)
+from .services.pipeline_service import compose_and_plan, compose_and_run, run_with_refine, save_feedback
 
 app = FastAPI(title="PromptChef MVP API", version="0.1")
 
@@ -16,6 +21,16 @@ def healthz() -> dict[str, str]:
 @app.post("/compose_and_run")
 def compose_and_run_endpoint(payload: ComposeAndRunRequest):
     return compose_and_run(payload)
+
+
+@app.post("/compose_and_plan")
+def compose_and_plan_endpoint(payload: ComposeAndPlanRequest):
+    return compose_and_plan(payload)
+
+
+@app.post("/run_with_refine")
+def run_with_refine_endpoint(payload: RunWithRefineRequest):
+    return run_with_refine(payload.bundle)
 
 
 @app.post("/feedback")

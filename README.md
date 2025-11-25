@@ -31,8 +31,12 @@ uv run promptchef /compose_and_run --file payload.json --pretty
 ```
 
 ## 사용 예시
+### 2단계 API 흐름 (MVP 사양 반영)
+
+1. **/compose_and_plan** — Planner + Composer (LLM Call #1)
+
 ```bash
-curl -X POST http://localhost:8000/compose_and_run \
+curl -X POST http://localhost:8000/compose_and_plan \
   -H "Content-Type: application/json" \
   -d '{
     "profile": {"role": "마케팅 매니저", "today_goal": "주간 보고", "tone_pref": "formal"},
@@ -40,4 +44,16 @@ curl -X POST http://localhost:8000/compose_and_run \
   }'
 ```
 
-응답에는 Planner 플랜, 합성된 프롬프트 섹션, 초안(preview), 보정본(final_output), 토큰/지연 메타가 포함됩니다.
+응답: `{ "plan": PlannerPlan, "bundle": { "plan": ..., "sections": {system, user, constraints, few_shot} } }`
+
+2. **/run_with_refine** — Runner + Self-Evaluator + Refiner (LLM Call #2)
+
+```bash
+curl -X POST http://localhost:8000/run_with_refine \
+  -H "Content-Type: application/json" \
+  -d '{ "bundle": { ...compose_and_plan에서 반환된 번들... } }'
+```
+
+응답: 최종 결과(`final_output`), 평가 메타(`eval_meta`), 초안(`draft`), 토큰/지연 메타(`meta`).
+
+기존 단일 `/compose_and_run` 엔드포인트도 계속 제공되며 두 단계를 내부에서 순차 실행합니다.

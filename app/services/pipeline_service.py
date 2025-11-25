@@ -10,22 +10,37 @@ from ..core.evaluator import evaluate
 from ..core.planner import planner
 from ..core.refiner import refine
 from ..core.runner import runner
-from ..models import AutoComposeResponse, ComposeAndRunRequest, ComposeAndRunResponse, EvalReport, PlannerPlan, RunMeta
+from ..models import (
+    AutoComposeResponse,
+    ComposeAndPlanRequest,
+    ComposeAndPlanResponse,
+    ComposeAndRunRequest,
+    ComposeAndRunResponse,
+    EvalReport,
+    PlannerPlan,
+    PromptBundle,
+    RunMeta,
+    RunWithRefineResponse,
+)
 from ..utils.constraints import adjust_confidence, dedupe_preserve_order
 
 
-def compose_with_plan(plan: PlannerPlan, user_input: str, *, start: float | None = None) -> ComposeAndRunResponse:
+def compose_with_plan(
+    plan: PromptBundle | PlannerPlan, user_input: str, *, start: float | None = None
+) -> ComposeAndRunResponse:
+    """Legacy helper that runs end-to-end with a provided plan or bundle."""
+
     timer_start = start if start is not None else time.time()
-    bundle = composer(plan, user_input)
-    draft_output = runner(bundle)
-    eval_report = evaluate(draft_output, plan)
+    bundle = plan if isinstance(plan, PromptBundle) else PromptBundle(plan=plan, sections=composer(plan, user_input))
+    draft_output = runner(bundle.sections)
+    eval_report = evaluate(draft_output, bundle.plan)
     final_output = refine(draft_output, eval_report)
     elapsed_ms = int((time.time() - timer_start) * 1000)
-    tokens_in = len(bundle.user.split()) + len(bundle.system.split())
+    tokens_in = len(bundle.sections.user.split()) + len(bundle.sections.system.split())
     tokens_out = len(final_output.split())
     meta = RunMeta(tokens_in=tokens_in, tokens_out=tokens_out, latency_ms=elapsed_ms)
     return ComposeAndRunResponse(
-        plan=plan,
+        plan=bundle.plan,
         bundle=bundle,
         preview=draft_output,
         final_output=final_output,
@@ -34,7 +49,40 @@ def compose_with_plan(plan: PlannerPlan, user_input: str, *, start: float | None
 
 
 def compose_and_run(request: ComposeAndRunRequest) -> ComposeAndRunResponse:
-    return compose_with_plan(planner(request), request.user_input, start=time.time())
+    plan = planner(request)
+    bundle = PromptBundle(plan=plan, sections=composer(plan, request.user_input))
+    run_response = run_with_refine(bundle)
+    return ComposeAndRunResponse(
+        plan=plan,
+        bundle=bundle,
+        preview=run_response.draft or "",
+        final_output=run_response.final_output,
+        meta=run_response.meta,
+    )
+
+
+def compose_and_plan(request: ComposeAndPlanRequest) -> ComposeAndPlanResponse:
+    plan = planner(request)
+    bundle = PromptBundle(plan=plan, sections=composer(plan, request.user_input))
+    return ComposeAndPlanResponse(plan=plan, bundle=bundle)
+
+
+def run_with_refine(bundle: PromptBundle) -> RunWithRefineResponse:
+    timer_start = time.time()
+    draft_output = runner(bundle.sections)
+    eval_report = evaluate(draft_output, bundle.plan)
+    final_output = refine(draft_output, eval_report)
+    elapsed_ms = int((time.time() - timer_start) * 1000)
+    tokens_in = len(bundle.sections.user.split()) + len(bundle.sections.system.split())
+    tokens_out = len(final_output.split())
+    meta = RunMeta(tokens_in=tokens_in, tokens_out=tokens_out, latency_ms=elapsed_ms)
+
+    return RunWithRefineResponse(
+        final_output=final_output,
+        eval_meta=eval_report,
+        meta=meta,
+        draft=draft_output,
+    )
 
 
 def _augment_plan_with_feedback(plan: PlannerPlan, report: EvalReport) -> PlannerPlan:
