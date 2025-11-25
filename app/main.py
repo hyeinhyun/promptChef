@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 
 from .models import ComposeAndRunRequest, FeedbackRequest
-from .pipeline import compose_and_run, save_feedback
+from .services.pipeline_service import compose_and_run, save_feedback
 
 app = FastAPI(title="PromptChef MVP API", version="0.1")
 

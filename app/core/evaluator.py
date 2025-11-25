@@ -1,36 +1,11 @@
 from __future__ import annotations
 
-"""Prompt composition, execution, and evaluation helpers."""
+"""Evaluation utilities for generated drafts."""
 
 import re
 from typing import List
 
-from .models import EvalCheck, EvalReport, PlannerPlan, PromptSection
-from .planning import build_few_shots, build_system_prompt, build_user_prompt
-
-
-def composer(plan: PlannerPlan, user_input: str) -> PromptSection:
-    system_prompt = build_system_prompt(plan.task_type, plan.tone)
-    user_prompt = build_user_prompt(user_input, plan)
-    few_shots = build_few_shots(plan.task_type)
-    return PromptSection(
-        system=system_prompt,
-        user=user_prompt,
-        constraints=plan.constraints,
-        few_shot=few_shots,
-    )
-
-
-def runner(bundle: PromptSection) -> str:
-    draft_lines = [
-        "제목: 자동 생성된 결과",
-        "본문 요약:",
-        "- 핵심 내용을 3~5문장으로 정리했습니다.",
-        "- 요청된 제약사항과 톤을 반영했습니다.",
-    ]
-    if any("Action items" in c for c in bundle.constraints):
-        draft_lines.append("- Action items: 후속 일정과 담당자를 포함했습니다.")
-    return "\n".join(draft_lines)
+from ..models import EvalCheck, EvalReport, PlannerPlan
 
 
 def build_eval_checks(draft: str, plan: PlannerPlan) -> EvalCheck:
@@ -74,13 +49,3 @@ def evaluate(draft: str, plan: PlannerPlan) -> EvalReport:
         checks=checks,
         suggestions=suggestions or ["전체적으로 요구사항을 충족했습니다."],
     )
-
-
-def refine(draft: str, report: EvalReport) -> str:
-    refined = draft
-    for suggestion in report.suggestions:
-        if "Action items" in suggestion and "Action items" not in refined:
-            refined += "\n- Action items: 다음 단계와 담당자를 명확히 작성했습니다."
-        if "문장 수" in suggestion:
-            refined += "\n- 본문을 4문장 내외로 재구성했습니다."
-    return refined

@@ -8,11 +8,15 @@ from typing import Any, Dict
 
 from pydantic import ValidationError
 
-from .config import AVAILABLE_MODELS, load_config, load_profile, set_model, update_profile
-from .generation import composer, evaluate, runner
+from .config import AVAILABLE_MODELS
+from .core.composer import composer
+from .core.evaluator import evaluate
+from .core.planner import planner
+from .core.runner import runner
 from .models import ComposeAndRunRequest, PlannerPlan, Profile
-from .pipeline import auto_compose_and_run, compose_and_run
-from .planning import planner
+from .services.model_service import set_model
+from .services.pipeline_service import auto_compose_and_run, compose_and_run
+from .services.settings_service import load_config, load_profile, update_profile
 
 
 def _load_payload(args: argparse.Namespace, *, allow_empty: bool = False) -> Dict[str, Any]:
