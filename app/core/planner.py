@@ -1,64 +1,20 @@
 from __future__ import annotations
 
-"""Planning utilities for PromptChef steps."""
+"""Planner logic for PromptChef."""
 
-from typing import Iterable, List, Sequence
+from typing import List, Sequence
 
-from .models import PlannerPlan
-
-BUSINESS_TONES = {
-    "formal": "격식 있고 간결한 존댓말",
-    "friendly": "친근하지만 예의 있는 톤",
-    "apology": "정중한 사과 톤",
-}
-
-TASK_KEYWORDS = {
-    "insight_extraction": {"표", "insight"},
-    "style_transfer": {"공지", "톤"},
-    "summary_email": {"회의", "보고"},
-}
-
-TASK_OUTPUT_FORMS = {
-    "summary_email": "보고용 요약 이메일",
-    "insight_extraction": "3~5개 불릿 인사이트",
-    "style_transfer": "톤 변환 공지문",
-    "general_brief": "간결한 비즈니스 요약",
-}
-
-BASE_CONSTRAINTS = [
-    "제목은 1줄로 작성",
-    "본문은 3~5문장으로 구성",
-    "모든 문장은 존댓말로 작성",
-    "과도한 확언/단정 금지",
-]
-
-TASK_CONSTRAINTS = {
-    "summary_email": ["Action items 2개 이상 포함"],
-    "insight_extraction": ["핵심 인사이트 3~5개 불릿으로 정리"],
-}
-
-CONSTRAINT_HINTS: Sequence[tuple[set[str], str, str]] = (
-    (
-        {"due", "deadline", "마감", "일정"},
-        "마감과 담당자를 명시하라는 제약을 추가합니다.",
-        "마감 일정과 담당자를 명확히 기재",
-    ),
-    (
-        {"표", "table", "data", "%", "자료"},
-        "숫자/데이터 근거를 표기하도록 요구합니다.",
-        "숫자 근거를 함께 제시",
-    ),
+from ..models import PlannerPlan
+from ..utils.constraints import (
+    BASE_CONSTRAINTS,
+    BUSINESS_TONES,
+    CONSTRAINT_HINTS,
+    TASK_CONSTRAINTS,
+    TASK_KEYWORDS,
+    TASK_OUTPUT_FORMS,
+    adjust_confidence,
+    dedupe_preserve_order,
 )
-
-
-def dedupe_preserve_order(items: Iterable[str]) -> List[str]:
-    seen = set()
-    ordered: List[str] = []
-    for item in items:
-        if item not in seen:
-            seen.add(item)
-            ordered.append(item)
-    return ordered
 
 
 def infer_tone(preferred: str | None) -> str:
@@ -109,44 +65,6 @@ def adjust_tone(current_tone: str, user_input: str, llm_suggestions: List[str]) 
         llm_suggestions.append("요청에 맞게 친근한 톤으로 전환합니다.")
         return "friendly"
     return current_tone
-
-
-def adjust_confidence(base_confidence: float, constraints: Sequence[str]) -> float:
-    coverage_score = min(1.0, 0.55 + 0.05 * len(constraints))
-    return round(min(1.0, base_confidence * 0.9 + coverage_score * 0.2), 2)
-
-
-def build_few_shots(task_type: str) -> List[str]:
-    examples = {
-        "summary_email": [
-            "[예시] 제목: 주간 마케팅 회의 요약\n- 핵심 결정 3개와 다음 액션을 숫자 목록으로 제공합니다.",
-        ],
-        "insight_extraction": [
-            "[예시] 표 요약: 매출 상위 3개 상품과 감소 구간을 bullet으로 제시합니다.",
-        ],
-        "style_transfer": [
-            "[예시] 동일 내용의 공지문을 더 정중한 톤으로 재작성합니다.",
-        ],
-    }
-    return examples.get(task_type, [])
-
-
-def build_system_prompt(task_type: str, tone: str) -> str:
-    tone_desc = BUSINESS_TONES.get(tone, BUSINESS_TONES["formal"])
-    return (
-        "당신은 한국 비즈니스 글쓰기 어시스턴트입니다. "
-        f"톤: {tone_desc}. 출력 형식을 반드시 준수하고 불필요한 장식을 피하세요."
-    )
-
-
-def build_user_prompt(user_input: str, plan: PlannerPlan) -> str:
-    return (
-        f"요청 유형: {plan.task_type}\n"
-        f"출력 형식: {plan.output_form}\n"
-        f"대상: {plan.audience}\n"
-        f"추가 제약: {', '.join(plan.constraints)}\n"
-        f"원문:\n{user_input.strip()}"
-    )
 
 
 def verify_plan_with_llm(plan: PlannerPlan, user_input: str) -> PlannerPlan:
