@@ -6,6 +6,7 @@ PromptChef는 한국 비즈니스 맥락에 맞춰 프롬프트를 계획·합�
 - `app/main.py`: FastAPI 엔드포인트(`/compose_and_run`, `/feedback`, `/healthz`).
 - `app/pipeline.py`: Planner → Composer → Runner → Evaluator → Refiner 파이프라인을 간단한 규칙 기반으로 구현.
 - `app/models.py`: 프로필, 플랜, 번들, 평가 리포트, 실행 메타데이터에 대한 Pydantic 모델.
+- `app/prompts/`: 시스템/유저 프롬프트 템플릿과 few-shot 예시를 모아 관리.
 
 ## 실행 방법
 uv(https://docs.astral.sh/uv/)으로 가상환경과 의존성을 관리하며, 필요한 패키지는 `pyproject.toml`에 정의되어 있습니다.
