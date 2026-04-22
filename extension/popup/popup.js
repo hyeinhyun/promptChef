@@ -28,7 +28,9 @@ const els = {
   modal: document.getElementById("levelup-modal"),
   modalTitle: document.getElementById("levelup-title"),
   modalBody: document.getElementById("levelup-body"),
-  modalClose: document.getElementById("levelup-close")
+  modalClose: document.getElementById("levelup-close"),
+  personaPopover: document.getElementById("persona-popover"),
+  personaOptions: document.querySelectorAll(".persona-option")
 };
 
 let state = null;
@@ -167,7 +169,9 @@ async function handleApprove() {
   });
   await pushHistory({
     at: new Date().toISOString(),
-    persona: state.user.persona,
+    // 히스토리에는 "이 결과를 만들 때" 쓴 페르소나를 남긴다.
+    // 결재 시점엔 이미 다른 페르소나로 바꿨을 수도 있어서 state.user.persona는 부정확.
+    persona: job.input?.persona || state.user.persona,
     snippet: job.result.prompt.slice(0, 80)
   });
   paintExp();
@@ -212,6 +216,55 @@ async function init() {
   renderJob(state.job, { restore: true });
   chrome.storage.onChanged.addListener(onStorageChanged);
 }
+
+// ----- 메이트 전환 팝오버 -----
+function openPersonaPopover() {
+  const current = state?.user?.persona;
+  els.personaOptions.forEach((btn) => {
+    btn.setAttribute("aria-selected", btn.dataset.persona === current ? "true" : "false");
+  });
+  els.personaPopover.classList.remove("hidden");
+  els.emoji.setAttribute("aria-expanded", "true");
+}
+function closePersonaPopover() {
+  els.personaPopover.classList.add("hidden");
+  els.emoji.setAttribute("aria-expanded", "false");
+}
+function isPersonaPopoverOpen() {
+  return !els.personaPopover.classList.contains("hidden");
+}
+
+async function handlePersonaPick(persona) {
+  if (!state?.user) return;
+  if (state.user.persona === persona) {
+    closePersonaPopover();
+    return;
+  }
+  // 진행 중인 job의 결과는 이미 고정이므로 건드리지 않는다. 다음 생성부터 새 persona가 적용된다.
+  state = await setState({ user: { ...state.user, persona } });
+  paintMate();
+  closePersonaPopover();
+}
+
+els.emoji.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (isPersonaPopoverOpen()) closePersonaPopover();
+  else openPersonaPopover();
+});
+els.personaOptions.forEach((btn) => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handlePersonaPick(btn.dataset.persona);
+  });
+});
+document.addEventListener("click", (e) => {
+  if (!isPersonaPopoverOpen()) return;
+  if (els.personaPopover.contains(e.target) || els.emoji.contains(e.target)) return;
+  closePersonaPopover();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && isPersonaPopoverOpen()) closePersonaPopover();
+});
 
 els.generateBtn.addEventListener("click", handleGenerate);
 els.approveBtn.addEventListener("click", handleApprove);

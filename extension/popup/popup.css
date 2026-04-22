@@ -8,3 +8,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Got
   100% { transform: scale(1); }
 }
 #levelup-modal:not(.hidden) > div { animation: pop 0.35s ease-out; }
+
+/* 헤더 내 메이트 이모지 트리거 + 전환 팝오버 */
+header { position: relative; }
+#mate-emoji { padding: 0; line-height: 1; }
+#mate-emoji:hover { opacity: 0.75; }
+
+#persona-popover {
+  position: absolute;
+  top: 100%;
+  left: 12px;
+  z-index: 10;
+  margin-top: 4px;
+  min-width: 210px;
+}
+.persona-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13px;
+  color: #334155;
+}
+.persona-option:hover { background-color: #f1f5f9; }
+.persona-option[aria-selected="true"] {
+  background-color: #e0e7ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+.persona-emoji { font-size: 20px; line-height: 1; }

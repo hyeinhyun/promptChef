@@ -9,7 +9,7 @@
 <body class="font-sans bg-slate-50 text-slate-800" style="width: 380px;">
   <!-- 헤더: 메이트 + 인사고과 -->
   <header class="bg-white px-4 py-3 border-b border-slate-200 flex items-center gap-3">
-    <div id="mate-emoji" class="text-3xl">🧑‍💼</div>
+    <button id="mate-emoji" class="text-3xl" title="메이트 바꾸기" aria-haspopup="true" aria-expanded="false">🧑‍💼</button>
     <div class="flex-1 min-w-0">
       <div class="flex items-baseline gap-2">
         <span id="mate-title" class="font-semibold text-sm truncate">메이트</span>
@@ -21,6 +21,22 @@
       <div id="exp-text" class="text-[10px] text-slate-500 mt-0.5">EXP 0</div>
     </div>
     <button id="open-options" title="설정" class="text-slate-400 hover:text-slate-700 p-1">⚙️</button>
+
+    <!-- 메이트 전환 팝오버 -->
+    <div id="persona-popover" class="hidden bg-white border border-slate-200 rounded-xl shadow-lg p-1" role="menu">
+      <button class="persona-option" data-persona="senior" role="menuitem">
+        <span class="persona-emoji">🧑‍💼</span>
+        <span>꼼꼼한 사수 박사수</span>
+      </button>
+      <button class="persona-option" data-persona="peer" role="menuitem">
+        <span class="persona-emoji">🧑‍🤝‍🧑</span>
+        <span>싹싹한 동기 김동기</span>
+      </button>
+      <button class="persona-option" data-persona="intern" role="menuitem">
+        <span class="persona-emoji">🧑‍🎓</span>
+        <span>엉뚱한 인턴 이인턴</span>
+      </button>
+    </div>
   </header>
 
   <!-- 입력 -->
