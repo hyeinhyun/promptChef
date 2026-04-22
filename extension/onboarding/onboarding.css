@@ -1,0 +1,20 @@
+.persona-card {
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 16px;
+  transition: all 0.15s ease;
+}
+.persona-card:hover {
+  background: #eef2ff;
+}
+.persona-card.selected {
+  border-color: #4f46e5;
+  background: #eef2ff;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+}
+.persona-emoji {
+  font-size: 36px;
+  line-height: 1;
+}

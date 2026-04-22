@@ -1,60 +1,114 @@
-# PromptChef MVP API
+# My Office Mate
 
-PromptChef는 한국 비즈니스 맥락에 맞춰 프롬프트를 계획·합성·평가·보정하여 미리보기를 제공하는 실험용 FastAPI 서비스입니다. 이 리포지토리는 외부 LLM 없이 동작하는 MVP 스켈레톤을 포함합니다.
+AI에 익숙하지 않은 직장인이 자연어만으로 고도화된 프롬프트를 만들 수 있도록 돕는 크롬 익스텐션 + FastAPI 백엔드.
 
-## 주요 구성
-- `app/main.py`: FastAPI 엔드포인트(`/compose_and_run`, `/feedback`, `/healthz`).
-- `app/pipeline.py`: Planner → Composer → Runner → Evaluator → Refiner 파이프라인을 간단한 규칙 기반으로 구현.
-- `app/models.py`: 프로필, 플랜, 번들, 평가 리포트, 실행 메타데이터에 대한 Pydantic 모델.
-- `app/prompts/`: 시스템/유저 프롬프트 템플릿과 few-shot 예시를 모아 관리.
+> "사내 동료(메이트)"가 옆자리에서 도와주는 느낌의 친근한 UI. 결과물에 만족하면 메이트의 인사고과(레벨)가 올라간다.
+
+## 컨셉
+- **타겟**: 마케터/기획자/영업 등 일반 사무직, AI 비숙련 사용자.
+- **차별점**:
+  1. AI 용어 배제(프롬프트/모델/토큰 같은 단어 노출 최소화).
+  2. 3종 메이트 페르소나 — 꼼꼼한 사수 / 싹싹한 동기 / 엉뚱한 인턴.
+  3. 결재 완료(복사) 클릭 시 EXP 적립 → 레벨업(수습 → 대리 → 팀장).
+
+## 개발 일정
+2026-04-22(수) ~ 2026-04-24(금) — 3일 스프린트.
+
+## 시스템 아키텍처
+```
+[Chrome Extension MV3]
+  ├─ popup/        자연어 입력 + 결과 카드 + EXP 게이지
+  ├─ onboarding/   닉네임 + 메이트 선택
+  └─ chrome.storage.local  (유저/EXP/레벨 저장)
+        │
+        │ HTTPS (ngrok 터널)
+        ▼
+[FastAPI Backend]
+  ├─ /generate           페르소나별 시스템 프롬프트 조립 + LLM Inference
+  ├─ /personas           페르소나 메타 반환
+  └─ LLM Router          fast(GPT-4o-mini / Gemini Flash) | deep(GPT-4o / Gemini Pro)
+```
+
+## 기술 스택
+**Frontend (Chrome Extension)**
+- Manifest V3, Vanilla JS, HTML, Tailwind CSS (CDN)
+- 상태: `chrome.storage.local` (별도 DB 없음)
+
+**Backend**
+- Python 3.11+, FastAPI, Pydantic
+- 패키지: `uv`
+- LLM: `openai`, `google-generativeai`
+- 배포: `ngrok` 임시 터널
 
 ## 실행 방법
-uv(https://docs.astral.sh/uv/)으로 가상환경과 의존성을 관리하며, 필요한 패키지는 `pyproject.toml`에 정의되어 있습니다.
 
+### 1. 백엔드
 ```bash
-# uv가 없다면 설치
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 프로젝트 의존성 설치
+cd backend
 uv venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 uv sync
 
-# 개발 서버 실행 (API가 필요할 때만)
+# 환경변수
+cp .env.example .env        # OPENAI_API_KEY, GOOGLE_API_KEY 채우기
+
+# 서버 실행
 uv run uvicorn app.main:app --reload --port 8000
 
-# CLI에서 직접 파이프라인 실행
-uv run promptchef compose_and_run \
-  --data '{"profile": {"role": "마케팅 매니저", "tone_pref": "formal"}, "user_input": "회의 메모: 신규 캠페인"}'
-
-# 또는 파일로 요청 전달 (stdin도 지원)
-uv run promptchef /compose_and_run --file payload.json --pretty
+# (옵션) ngrok 터널
+ngrok http 8000
 ```
 
-## 사용 예시
-### 2단계 API 흐름 (MVP 사양 반영)
+### 2. 익스텐션 로드
+1. Chrome → `chrome://extensions` 진입.
+2. "개발자 모드" 토글 ON.
+3. "압축해제된 확장 프로그램을 로드합니다" → `extension/` 폴더 선택.
+4. 익스텐션 옵션에서 백엔드 URL 입력 (기본: `http://localhost:8000`).
 
-1. **/compose_and_plan** — Planner + Composer (LLM Call #1)
+## 폴더 구조
+```
+backend/
+  app/
+    main.py          FastAPI 엔드포인트
+    personas.py      메이트 3종 시스템 프롬프트
+    llm_router.py    OpenAI / Gemini 라우팅
+    models.py        Pydantic 스키마
+    config.py        설정 로드
+  pyproject.toml
+  .env.example
 
-```bash
-curl -X POST http://localhost:8000/compose_and_plan \
-  -H "Content-Type: application/json" \
-  -d '{
-    "profile": {"role": "마케팅 매니저", "today_goal": "주간 보고", "tone_pref": "formal"},
-    "user_input": "회의 메모: 신규 캠페인 CTR 12% 개선, 예산 5% 상향 요청"
-  }'
+extension/
+  manifest.json
+  popup/             메인 UI (자연어 입력 + 결과)
+  onboarding/        초기 1회 설정
+  options/           백엔드 URL 등 설정
+  lib/               storage / api / exp 헬퍼
+  assets/            아이콘 + 캐릭터 SVG
 ```
 
-응답: `{ "plan": PlannerPlan, "bundle": { "plan": ..., "sections": {system, user, constraints, few_shot} } }`
-
-2. **/run_with_refine** — Runner + Self-Evaluator + Refiner (LLM Call #2)
-
-```bash
-curl -X POST http://localhost:8000/run_with_refine \
-  -H "Content-Type: application/json" \
-  -d '{ "bundle": { ...compose_and_plan에서 반환된 번들... } }'
+## API 계약
+### POST `/generate`
+요청:
+```json
+{
+  "user_input": "다음 주 캠페인 회의 준비 자료 만들어줘",
+  "persona": "senior",        // senior | peer | intern
+  "brain": "fast",            // fast | deep
+  "nickname": "현이"
+}
+```
+응답:
+```json
+{
+  "prompt": "당신은 ...\n\n# 작업\n...\n\n# 출력 형식\n...",
+  "meta": {
+    "persona": "senior",
+    "brain": "fast",
+    "model": "gpt-4o-mini",
+    "latency_ms": 842
+  }
+}
 ```
 
-응답: 최종 결과(`final_output`), 평가 메타(`eval_meta`), 초안(`draft`), 토큰/지연 메타(`meta`).
-
-기존 단일 `/compose_and_run` 엔드포인트도 계속 제공되며 두 단계를 내부에서 순차 실행합니다.
+### GET `/personas`
+3종 메이트 메타 반환 (id, 이름, 설명, 톤 키워드).

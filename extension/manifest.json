@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "My Office Mate",
+  "version": "0.1.0",
+  "description": "AI에 익숙하지 않아도 자연어 한 줄이면 고품질 프롬프트가 완성됩니다. 사내 메이트가 도와드릴게요.",
+  "default_locale": "ko",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "My Office Mate",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "options_page": "options/options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["storage", "clipboardWrite", "notifications"],
+  "host_permissions": ["http://localhost/*", "https://*.ngrok-free.app/*", "https://*.ngrok.io/*"]
+}
