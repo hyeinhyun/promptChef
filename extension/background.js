@@ -32,25 +32,37 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // fire-and-forget fetch는 이 타이머에 잡히지 않아서, 느린 LLM 응답 중간에
 // SW가 죽고 fetch가 abort되는 일이 생긴다. 주기적으로 chrome API를 호출해
 // idle 타이머를 리셋한다.
+// activeJobs로 ref-count: 동시에 여러 요청이 들어와도 마지막 하나가 끝날 때
+// 까지 타이머를 유지해야, 먼저 끝난 쪽의 finally가 남은 fetch까지 죽이지 않는다.
 let keepAliveTimer = null;
-let keepAliveCount = 0;
+let keepAlivePingCount = 0;
+let activeJobs = 0;
 
 function startKeepAlive() {
-  if (keepAliveTimer) return;
-  keepAliveCount = 0;
-  console.log("[bg] keep-alive start");
+  activeJobs += 1;
+  if (keepAliveTimer) {
+    console.log("[bg] keep-alive reuse. activeJobs=", activeJobs);
+    return;
+  }
+  keepAlivePingCount = 0;
+  console.log("[bg] keep-alive start. activeJobs=", activeJobs);
   keepAliveTimer = setInterval(() => {
-    keepAliveCount += 1;
+    keepAlivePingCount += 1;
     // 어떤 chrome.* API든 한 번 부르면 idle 타이머가 리셋된다.
     chrome.runtime.getPlatformInfo().then(() => {
-      console.log("[bg] keep-alive ping", keepAliveCount);
+      console.log("[bg] keep-alive ping", keepAlivePingCount);
     }).catch(() => {});
   }, 20_000);
 }
 
 function stopKeepAlive() {
+  activeJobs = Math.max(0, activeJobs - 1);
+  if (activeJobs > 0) {
+    console.log("[bg] keep-alive held. activeJobs=", activeJobs);
+    return;
+  }
   if (!keepAliveTimer) return;
-  console.log("[bg] keep-alive stop after", keepAliveCount, "pings");
+  console.log("[bg] keep-alive stop after", keepAlivePingCount, "pings");
   clearInterval(keepAliveTimer);
   keepAliveTimer = null;
 }

@@ -180,6 +180,24 @@ async function handleApprove() {
   }
 }
 
+// 팝업이 열려 있는 동안 백그라운드가 job을 갱신하면 반영한다.
+// state가 초기화된 뒤에만 등록해야 한다. 팝업이 열리자마자 background가
+// storage를 갱신하는 경우가 이 PR의 핵심 시나리오라, state=null 상태에서
+// ...state.settings / ...state.job를 평가하면 바로 터진다.
+function onStorageChanged(changes, area) {
+  if (area !== "local") return;
+  const change = changes[STORAGE_KEY];
+  if (!change?.newValue) return;
+  const next = change.newValue;
+  state = {
+    ...state,
+    ...next,
+    settings: { ...state.settings, ...(next.settings || {}) },
+    job: { ...state.job, ...(next.job || {}) }
+  };
+  renderJob(state.job);
+}
+
 async function init() {
   state = await getState();
   console.log("[popup] init state.job=", state.job);
@@ -192,22 +210,8 @@ async function init() {
   paintExp();
   els.brain.value = state.settings.brain || "fast";
   renderJob(state.job, { restore: true });
+  chrome.storage.onChanged.addListener(onStorageChanged);
 }
-
-// 팝업이 열려 있는 동안 백그라운드가 job을 갱신하면 반영한다.
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local") return;
-  const change = changes[STORAGE_KEY];
-  if (!change?.newValue) return;
-  const next = change.newValue;
-  state = {
-    ...state,
-    ...next,
-    settings: { ...state.settings, ...(next.settings || {}) },
-    job: { ...state.job, ...(next.job || {}) }
-  };
-  renderJob(state.job);
-});
 
 els.generateBtn.addEventListener("click", handleGenerate);
 els.approveBtn.addEventListener("click", handleApprove);
