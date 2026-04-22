@@ -1,6 +1,7 @@
 import { getState, setState, pushHistory } from "../lib/storage.js";
-import { generatePrompt } from "../lib/api.js";
 import { awardApproval, levelFromExp, progressInLevel } from "../lib/exp.js";
+
+const STORAGE_KEY = "officeMate.v1";
 
 const PERSONA_META = {
   senior: { emoji: "🧑‍💼", title: "꼼꼼한 사수 박사수" },
@@ -31,7 +32,7 @@ const els = {
 };
 
 let state = null;
-let lastResult = null;
+let lastRenderedJobKey = null;
 
 function paintMate() {
   const meta = PERSONA_META[state.user?.persona] || PERSONA_META.senior;
@@ -60,6 +61,59 @@ function showStatus(msg) {
 }
 function clearStatus() { els.status.classList.add("hidden"); }
 
+function renderApproveButton(approved) {
+  if (approved) {
+    els.approveBtn.textContent = "복사 완료 ✓";
+    els.approveBtn.disabled = true;
+  } else {
+    els.approveBtn.textContent = "👍 결재 완료 (복사)";
+    els.approveBtn.disabled = false;
+  }
+}
+
+// 팝업을 다시 열었을 때 state.job 을 보고 UI를 복원한다.
+// 처음 로드인지(restore=true) 아니면 실시간 갱신인지에 따라 입력창을 건드릴지 결정한다.
+function renderJob(job, { restore = false } = {}) {
+  if (!job) job = { status: "idle" };
+  const key = `${job.status}:${job.finishedAt || job.startedAt || ""}:${job.approved ? 1 : 0}`;
+  if (key === lastRenderedJobKey) return;
+  lastRenderedJobKey = key;
+
+  if (job.status === "pending") {
+    clearError();
+    els.card.classList.add("hidden");
+    els.generateBtn.disabled = true;
+    showStatus("메이트가 정리하고 있어요…");
+    if (restore && job.input?.userInput) els.input.value = job.input.userInput;
+    return;
+  }
+  if (job.status === "success" && job.result) {
+    clearStatus();
+    clearError();
+    els.resultText.textContent = job.result.prompt;
+    const m = job.result.meta || {};
+    els.resultMeta.textContent = `${m.provider || ""}/${m.model || ""} · ${m.latency_ms ?? ""}ms`;
+    els.card.classList.remove("hidden");
+    els.generateBtn.disabled = false;
+    renderApproveButton(job.approved);
+    if (restore && job.input?.userInput) els.input.value = job.input.userInput;
+    return;
+  }
+  if (job.status === "error") {
+    clearStatus();
+    els.card.classList.add("hidden");
+    els.generateBtn.disabled = false;
+    showError(job.error || "생성에 실패했어요.");
+    if (restore && job.input?.userInput) els.input.value = job.input.userInput;
+    return;
+  }
+  // idle
+  clearStatus();
+  clearError();
+  els.card.classList.add("hidden");
+  els.generateBtn.disabled = false;
+}
+
 async function handleGenerate() {
   const text = els.input.value.trim();
   if (!text) {
@@ -71,52 +125,53 @@ async function handleGenerate() {
   els.generateBtn.disabled = true;
   showStatus("메이트가 정리하고 있어요…");
 
+  const payload = {
+    userInput: text,
+    persona: state.user.persona,
+    brain: els.brain.value,
+    nickname: state.user.nickname
+  };
+
   try {
-    const data = await generatePrompt({
-      backendUrl: state.settings.backendUrl,
-      userInput: text,
-      persona: state.user.persona,
-      brain: els.brain.value,
-      provider: state.settings.provider,
-      nickname: state.user.nickname
-    });
-    lastResult = data;
-    els.resultText.textContent = data.prompt;
-    els.resultMeta.textContent = `${data.meta.provider}/${data.meta.model} · ${data.meta.latency_ms}ms`;
-    els.card.classList.remove("hidden");
-    clearStatus();
+    const resp = await chrome.runtime.sendMessage({ type: "GENERATE_PROMPT", payload });
+    console.log("[popup] sendMessage resp=", resp);
   } catch (e) {
+    console.error("[popup] sendMessage failed", e);
     clearStatus();
-    showError(e.message || "생성에 실패했어요.");
-  } finally {
+    showError("백그라운드와 통신에 실패했어요: " + (e?.message || e));
     els.generateBtn.disabled = false;
   }
 }
 
 async function handleApprove() {
-  if (!lastResult?.prompt) return;
+  const job = state.job;
+  if (!job?.result?.prompt || job.status !== "success") return;
   try {
-    await navigator.clipboard.writeText(lastResult.prompt);
+    await navigator.clipboard.writeText(job.result.prompt);
   } catch (e) {
     showError("클립보드 복사에 실패했어요: " + e.message);
     return;
   }
 
+  // 이미 결재한 결과에 중복 EXP를 주지 않는다.
+  if (job.approved) {
+    renderApproveButton(true);
+    return;
+  }
+
   const { nextExp, leveledUp, after } = awardApproval(state.exp);
-  state = await setState({ exp: nextExp, level: after.level });
+  state = await setState({
+    exp: nextExp,
+    level: after.level,
+    job: { approved: true }
+  });
   await pushHistory({
     at: new Date().toISOString(),
     persona: state.user.persona,
-    snippet: lastResult.prompt.slice(0, 80)
+    snippet: job.result.prompt.slice(0, 80)
   });
   paintExp();
-
-  els.approveBtn.textContent = "복사 완료 ✓ +20 EXP";
-  els.approveBtn.disabled = true;
-  setTimeout(() => {
-    els.approveBtn.textContent = "👍 결재 완료 (복사)";
-    els.approveBtn.disabled = false;
-  }, 1800);
+  renderApproveButton(true);
 
   if (leveledUp) {
     els.modalTitle.textContent = `🎉 ${after.title}으로 승진!`;
@@ -125,8 +180,27 @@ async function handleApprove() {
   }
 }
 
+// 팝업이 열려 있는 동안 백그라운드가 job을 갱신하면 반영한다.
+// state가 초기화된 뒤에만 등록해야 한다. 팝업이 열리자마자 background가
+// storage를 갱신하는 경우가 이 PR의 핵심 시나리오라, state=null 상태에서
+// ...state.settings / ...state.job를 평가하면 바로 터진다.
+function onStorageChanged(changes, area) {
+  if (area !== "local") return;
+  const change = changes[STORAGE_KEY];
+  if (!change?.newValue) return;
+  const next = change.newValue;
+  state = {
+    ...state,
+    ...next,
+    settings: { ...state.settings, ...(next.settings || {}) },
+    job: { ...state.job, ...(next.job || {}) }
+  };
+  renderJob(state.job);
+}
+
 async function init() {
   state = await getState();
+  console.log("[popup] init state.job=", state.job);
   if (!state.user) {
     chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/onboarding.html") });
     window.close();
@@ -135,6 +209,8 @@ async function init() {
   paintMate();
   paintExp();
   els.brain.value = state.settings.brain || "fast";
+  renderJob(state.job, { restore: true });
+  chrome.storage.onChanged.addListener(onStorageChanged);
 }
 
 els.generateBtn.addEventListener("click", handleGenerate);
