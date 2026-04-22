@@ -16,11 +16,28 @@ def _resolve_model(provider: Provider, brain: BrainTier) -> str:
 
 
 def _resolve_provider(requested: Provider | None) -> Provider:
+    """요청 > 기본 설정 > 키가 있는 공급자 순으로 결정. 어느 것도 없으면 LLMError."""
+    openai_ready = bool(settings.openai_api_key)
+    google_ready = bool(settings.google_api_key)
+
     if requested:
+        if requested == "openai" and not openai_ready:
+            raise LLMError("OPENAI_API_KEY가 설정되지 않았습니다.")
+        if requested == "google" and not google_ready:
+            raise LLMError("GOOGLE_API_KEY가 설정되지 않았습니다.")
         return requested
-    if settings.default_provider in ("openai", "google"):
-        return settings.default_provider  # type: ignore[return-value]
-    return "openai"
+
+    preferred = settings.default_provider if settings.default_provider in ("openai", "google") else "openai"
+    if preferred == "openai" and openai_ready:
+        return "openai"
+    if preferred == "google" and google_ready:
+        return "google"
+    # 선호값 키가 없으면 다른 쪽으로 fallback.
+    if openai_ready:
+        return "openai"
+    if google_ready:
+        return "google"
+    raise LLMError("OPENAI_API_KEY 또는 GOOGLE_API_KEY 중 최소 하나는 설정되어야 합니다.")
 
 
 async def generate(

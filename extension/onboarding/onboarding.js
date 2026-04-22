@@ -83,7 +83,7 @@ submitBtn.addEventListener("click", async () => {
         <p class="text-slate-600 mt-2 text-sm">이제 브라우저 우측 상단의 메이트 아이콘을 눌러 시작하세요.</p>
       </main>
     `;
-    document.body.className = "bg-slate-50 min-h-screen flex items-center justify-center p-6";
+    document.body.className = "font-sans bg-slate-50 min-h-screen flex items-center justify-center p-6";
   } catch (e) {
     errorEl.textContent = "저장에 실패했어요: " + e.message;
     errorEl.classList.remove("hidden");

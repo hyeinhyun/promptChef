@@ -31,7 +31,7 @@ AI에 익숙하지 않은 직장인이 자연어만으로 고도화된 프롬프
 
 ## 기술 스택
 **Frontend (Chrome Extension)**
-- Manifest V3, Vanilla JS, HTML, Tailwind CSS (CDN)
+- Manifest V3, Vanilla JS, HTML, 정적 CSS (`extension/styles/app.css` — Tailwind 스타일의 유틸리티 클래스. MV3 CSP 때문에 CDN 미사용.)
 - 상태: `chrome.storage.local` (별도 DB 없음)
 
 **Backend**
