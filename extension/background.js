@@ -21,15 +21,43 @@ chrome.action.onClicked.addListener(async () => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log("[bg] onMessage", message?.type);
   if (message?.type === "GENERATE_PROMPT") {
-    // fire-and-forget. 서비스 워커는 fetch가 끝날 때까지 살아있다.
+    // fire-and-forget. keep-alive 루프가 SW 수명을 지켜준다.
     runGeneration(message.payload);
     sendResponse({ ok: true });
     return false;
   }
 });
 
+// MV3 서비스 워커는 이벤트 핸들러가 반환된 뒤 30초 idle이면 종료된다.
+// fire-and-forget fetch는 이 타이머에 잡히지 않아서, 느린 LLM 응답 중간에
+// SW가 죽고 fetch가 abort되는 일이 생긴다. 주기적으로 chrome API를 호출해
+// idle 타이머를 리셋한다.
+let keepAliveTimer = null;
+let keepAliveCount = 0;
+
+function startKeepAlive() {
+  if (keepAliveTimer) return;
+  keepAliveCount = 0;
+  console.log("[bg] keep-alive start");
+  keepAliveTimer = setInterval(() => {
+    keepAliveCount += 1;
+    // 어떤 chrome.* API든 한 번 부르면 idle 타이머가 리셋된다.
+    chrome.runtime.getPlatformInfo().then(() => {
+      console.log("[bg] keep-alive ping", keepAliveCount);
+    }).catch(() => {});
+  }, 20_000);
+}
+
+function stopKeepAlive() {
+  if (!keepAliveTimer) return;
+  console.log("[bg] keep-alive stop after", keepAliveCount, "pings");
+  clearInterval(keepAliveTimer);
+  keepAliveTimer = null;
+}
+
 async function runGeneration(payload) {
   console.log("[bg] runGeneration start", payload);
+  startKeepAlive();
   const startedAt = new Date().toISOString();
   const state = await setState({
     job: {
@@ -73,5 +101,7 @@ async function runGeneration(payload) {
         finishedAt: new Date().toISOString()
       }
     });
+  } finally {
+    stopKeepAlive();
   }
 }
