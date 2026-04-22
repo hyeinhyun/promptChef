@@ -12,7 +12,11 @@ class Settings(BaseSettings):
     fast_model_google: str = "gemini-1.5-flash"
     deep_model_google: str = "gemini-1.5-pro"
 
-    default_provider: str = "openai"  # openai | google
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    fast_model_ollama: str = "qwen3.5:4b"
+    deep_model_ollama: str = "qwen3.5:4b"
+
+    default_provider: str = "openai"  # openai | google | ollama
     allowed_origins: str = "*"
 
 

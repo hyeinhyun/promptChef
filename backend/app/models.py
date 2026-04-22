@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 PersonaId = Literal["senior", "peer", "intern"]
 BrainTier = Literal["fast", "deep"]
-Provider = Literal["openai", "google"]
+Provider = Literal["openai", "google", "ollama"]
 
 
 class GenerateRequest(BaseModel):
