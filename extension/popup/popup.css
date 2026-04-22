@@ -1,0 +1,10 @@
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+
+#exp-bar { transition: width 0.6s cubic-bezier(.4,1.4,.6,1); }
+
+@keyframes pop {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+#levelup-modal:not(.hidden) > div { animation: pop 0.35s ease-out; }
